@@ -50,34 +50,34 @@ HTML_CONTENT = """
             transition: 0.3s; letter-spacing: 2px;
         }
         button:hover { background: var(--neon); color: black; box-shadow: 0 0 20px var(--neon); }
-        .info { font-size: 0.6rem; color: #555; line-height: 1.2; }
+        .info { font-size: 0.6rem; color: #555; line-height: 1.2; margin-bottom: 5px; }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="monogram-container">
-            <img src="https://raw.githubusercontent.com/gidodido815-sketch/cortador-pdf-web2/main/WhatsApp%20Image%202026-05-07%20at%2020.20.39.jpeg" alt="SDE">
+            <img src="https://raw.githubusercontent.com/gidodido815-sketch/cortador-pdf-web2/main/WhatsApp%20Image%202026-05-07%20at%2020.20.39.jpeg" alt="SDE LOGO">
         </div>
-        <h1>SISTEMA DE EXTRACCIÓN PERICIAL</h1>
+        <h1>SISTEMA DE EXTRACCIÓN DIGITAL</h1>
     </div>
     
     <div class="container">
         <form action="/procesar" method="post" enctype="multipart/form-data">
-            <label>DOCUMENTO PDF</label>
+            <label>DOCUMENTO PDF DE ORIGEN</label>
             <input type="file" name="file" accept=".pdf" required>
             
-            <label>CONFIGURACIÓN DE PÁGINAS</label>
-            <div class="info">Sueltas: 1,4,8 | Rango: 1-5 | Mixto: 1-3,7</div>
-            <input type="text" name="pages" placeholder="Ej: 1,3,5-8" required>
+            <label>SELECCIÓN DE PÁGINAS</label>
+            <div class="info">Ejemplos: 1,4,8 (sueltas) | 1-5 (rango) | 1,3,5-10 (mixto)</div>
+            <input type="text" name="pages" placeholder="Ej: 1,4,8" required>
             
-            <label>MODO DE SALIDA</label>
+            <label>MODO DE DESCARGA</label>
             <select name="format">
-                <option value="single_pdf">Un solo bloque (Un solo PDF)</option>
-                <option value="zip_pdf">Páginas individuales (Carpeta ZIP de PDFs)</option>
-                <option value="zip_jpg">Imágenes individuales (Carpeta ZIP de JPGs)</option>
+                <option value="single_pdf">Bloque Único (Un solo archivo PDF)</option>
+                <option value="zip_pdf">Carpeta de Archivos (ZIP con PDFs individuales)</option>
+                <option value="zip_jpg">Carpeta de Imágenes (ZIP con JPGs individuales)</option>
             </select>
             
-            <button type="submit">EJECUTAR PROCESO</button>
+            <button type="submit">EJECUTAR PROCESAMIENTO</button>
         </form>
     </div>
     <p style="margin-top: 20px; font-size: 0.6rem; color: #333;">AUDITORÍA DIGITAL - SANTIAGO DEL ESTERO</p>
@@ -85,22 +85,22 @@ HTML_CONTENT = """
 </html>
 """
 
-def get_page_list(pages_str, max_pages):
-    """Procesa la entrada del usuario para obtener una lista de números de página."""
-    pages = set()
+def parse_pages(pages_str, max_pages):
+    """Convierte la entrada de texto en una lista de números de página válidos."""
+    indices = set()
     parts = re.split(r'[,\s]+', pages_str)
     for part in parts:
         if '-' in part:
             try:
-                s, e = map(int, part.split('-'))
-                pages.update(range(max(1, s), min(e, max_pages) + 1))
+                start, end = map(int, part.split('-'))
+                indices.update(range(max(1, start), min(end, max_pages) + 1))
             except: continue
         else:
             try:
                 p = int(part)
-                if 1 <= p <= max_pages: pages.add(p)
+                if 1 <= p <= max_pages: indices.add(p)
             except: continue
-    return sorted(list(pages))
+    return sorted(list(indices))
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
@@ -108,38 +108,40 @@ async def home():
 
 @app.post("/procesar")
 async def procesar(file: UploadFile = File(...), pages: str = Form(...), format: str = Form(...)):
-    data = await file.read()
-    doc = fitz.open(stream=data, filetype="pdf")
-    target_pages = get_page_list(pages, len(doc))
+    # Leer archivo
+    content = await file.read()
+    doc = fitz.open(stream=content, filetype="pdf")
     
+    # Obtener lista de páginas solicitadas (ej: 1, 4, 8)
+    target_pages = parse_pages(pages, len(doc))
     output = io.BytesIO()
     
     if format == "single_pdf":
-        # Opción: Todas las seleccionadas en un solo archivo
-        new_pdf = fitz.open()
+        # Une todas las seleccionadas en un solo archivo PDF
+        res_pdf = fitz.open()
         for p in target_pages:
-            new_pdf.insert_pdf(doc, from_page=p-1, to_page=p-1)
-        new_pdf.save(output)
-        new_pdf.close()
-        mimetype, filename = "application/pdf", "seleccion_unificada.pdf"
+            res_pdf.insert_pdf(doc, from_page=p-1, to_page=p-1)
+        res_pdf.save(output)
+        res_pdf.close()
+        mimetype, filename = "application/pdf", "bloque_unificado.pdf"
         
     elif format == "zip_pdf":
-        # Opción: Cada página un PDF separado dentro de un ZIP
+        # Crea un ZIP donde cada página elegida es un archivo PDF separado
         with zipfile.ZipFile(output, "a") as zf:
             for p in target_pages:
                 temp_pdf = fitz.open()
                 temp_pdf.insert_pdf(doc, from_page=p-1, to_page=p-1)
                 zf.writestr(f"pagina_{p}.pdf", temp_pdf.write())
                 temp_pdf.close()
-        mimetype, filename = "application/zip", "paginas_individuales_pdf.zip"
+        mimetype, filename = "application/zip", "archivos_individuales.zip"
         
     else: # zip_jpg
-        # Opción: Cada página una imagen dentro de un ZIP
+        # Crea un ZIP con cada página convertida a imagen JPG
         with zipfile.ZipFile(output, "a") as zf:
             for p in target_pages:
                 pix = doc[p-1].get_pixmap(matrix=fitz.Matrix(2, 2))
                 zf.writestr(f"pagina_{p}.jpg", pix.tobytes("jpg"))
-        mimetype, filename = "application/zip", "paginas_individuales_jpg.zip"
+        mimetype, filename = "application/zip", "imagenes_individuales.zip"
 
     doc.close()
     gc.collect()

@@ -9,15 +9,17 @@ import fitz  # PyMuPDF
 app = FastAPI()
 
 # --- CONFIGURACIÓN DE MONETIZACIÓN ---
-ADSENSE_ID = "ca-pub-XXXXXXXXXXXX"  # Reemplaza con tu ID de Google AdSense
-ALIAS_PAGO = "Programas863"     # Tu alias de Mercado Pago o CVU
+# ID de cliente extraído de tu captura de pantalla de verificación
+ADSENSE_SCRIPT = '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3283369890047945" crossorigin="anonymous"></script>'
+ALIAS_PAGO = "Proyectos863"
 
-# Estilos y Estructura Base
-HTML_HEAD = f"""
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>SDE - PROCESAMIENTO DIGITAL</title>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={ADSENSE_ID}" crossorigin="anonymous"></script>
+    <title>SDE - TERMINAL DE PROCESAMIENTO</title>
+    {adsense_script}
     <style>
         :root {{ --neon: #00f2ff; --bg: #0a0a0b; }}
         body {{ font-family: 'Courier New', monospace; background: var(--bg); color: white; text-align: center; padding: 20px; }}
@@ -30,77 +32,78 @@ HTML_HEAD = f"""
         .pay-card {{ border: 1px solid #ffcc00; color: #ffcc00; padding: 20px; margin-top: 10px; border-radius: 8px; }}
     </style>
 </head>
+<body>
+    <div class="card">
+        <img src="https://raw.githubusercontent.com/gidodido815-sketch/cortador-pdf-web2/main/WhatsApp%20Image%202026-05-07%20at%2020.20.39.jpeg" width="80" style="border-radius:50%; border:2px solid var(--neon); margin-bottom:15px;">
+        {content}
+    </div>
+    <script>
+        function iniciarEspera() {{
+            window.open('https://www.google.com', '_blank');
+            document.getElementById('main-ui').style.display = 'none';
+            document.getElementById('waiting').style.display = 'block';
+            let s = 15;
+            const t = setInterval(() => {{
+                s--;
+                document.getElementById('timer').innerText = s;
+                if(s <= 0) {{
+                    clearInterval(t);
+                    document.forms[0].submit();
+                    setTimeout(() => location.reload(), 3000);
+                }}
+            }}, 1000);
+        }}
+    </script>
+</body>
+</html>
 """
 
 @app.get("/", response_class=HTMLResponse)
 async def home(uses: str = Cookie(None)):
     current_uses = int(uses) if uses else 0
     
-    # LÓGICA DE BLOQUEO (Límite: 2 usos)
     if current_uses >= 2:
         content = f"""
-        <h2 style="color:red;">LÍMITE DIARIO ALCANZADO</h2>
-        <p>Has agotado tus 2 extracciones gratuitas por hoy.</p>
+        <h2 style="color:red;">LÍMITE ALCANZADO</h2>
+        <p>Has agotado tus 2 usos gratuitos de hoy.</p>
         <div class="pay-card">
-            <strong>PARA ACCESO ILIMITADO HOY:</strong><br><br>
-            Transferir a Alias:<br>
-            <span style="font-size:1.2rem; background:#333; padding:5px;">{ALIAS_PAGO}</span><br><br>
-            Envía el comprobante para habilitar.
+            <strong>ACCESO ILIMITADO:</strong><br><br>
+            Alias Mercado Pago:<br>
+            <span style="font-size:1.3rem; background:#333; padding:5px;">{ALIAS_PAGO}</span><br><br>
+            Envía el comprobante para activar.
         </div>
-        <p style="font-size:0.7rem; color:#666; margin-top:20px;">O vuelve mañana para otros 2 usos con publicidad.</p>
         """
     else:
         content = """
         <div id="main-ui">
-            <h2>TERMINAL DE EXTRACCIÓN</h2>
-            <div class="ad-box">PUBLICIDAD ADSENSE (BANNER SUPERIOR)</div>
-            <form action="/procesar" method="post" enctype="multipart/form-data" onsubmit="iniciarEspera();">
+            <h2>SISTEMA DE EXTRACCIÓN</h2>
+            <div class="ad-box">ANUNCIO ADSENSE</div>
+            <form action="/procesar" method="post" enctype="multipart/form-data" onsubmit="event.preventDefault(); iniciarEspera();">
                 <input type="file" name="file" accept=".pdf" required>
-                <input type="text" name="pages" placeholder="Páginas (ej: 1,4,8)" required>
+                <input type="text" name="pages" placeholder="Páginas (ej: 1,3-5)" required>
                 <select name="format">
                     <option value="single_pdf">Bloque Único (PDF)</option>
                     <option value="zip_pdf">Individuales (ZIP)</option>
                 </select>
-                <button type="submit" class="btn">PROCESAR DOCUMENTO</button>
+                <button type="submit" class="btn">EJECUTAR PROCESAMIENTO</button>
             </form>
-            <div class="ad-box">PUBLICIDAD ADSENSE (BANNER INFERIOR)</div>
+            <div class="ad-box">ANUNCIO ADSENSE</div>
         </div>
         <div id="waiting">
-            <h2 style="color:var(--neon);">PROCESANDO SEGURIDAD...</h2>
-            <p>Observe los anuncios mientras preparamos su descarga.</p>
+            <h2 style="color:var(--neon);">PROCESANDO...</h2>
+            <p>Prepare su descarga viendo los anuncios.</p>
             <div style="font-size:3rem; margin:20px 0;" id="timer">15</div>
-            <div class="ad-box" style="min-height:250px;">ANUNCIO PREMIUM (VIDEO/INTERSTITIAL)</div>
+            <div class="ad-box" style="min-height:250px;">ANUNCIO PREMIUM</div>
         </div>
-        <script>
-            function iniciarEspera() {
-                window.open('https://www.google.com', '_blank'); // Abre publicidad en otra pestaña
-                document.getElementById('main-ui').style.display = 'none';
-                document.getElementById('waiting').style.display = 'block';
-                let s = 15;
-                const t = setInterval(() => {
-                    s--;
-                    document.getElementById('timer').innerText = s;
-                    if(s <= 0) {
-                        clearInterval(t);
-                        document.forms[0].submit();
-                        setTimeout(() => location.reload(), 3000);
-                    }
-                }, 1000);
-            }
-        </script>
         """
-
-    return f"<html>{HTML_HEAD}<body><div class='card'><img src='https://raw.githubusercontent.com/gidodido815-sketch/cortador-pdf-web2/main/WhatsApp%20Image%202026-05-07%20at%2020.20.39.jpeg' width='80' style='border-radius:50%; border:2px solid var(--neon);'>{content}</div></body></html>"
+    return HTML_TEMPLATE.format(adsense_script=ADSENSE_SCRIPT, content=content)
 
 @app.post("/procesar")
 async def procesar(response: Response, file: UploadFile = File(...), pages: str = Form(...), format: str = Form(...), uses: str = Cookie(None)):
     current_uses = int(uses) if uses else 0
-    
-    # Procesar PDF
     content = await file.read()
     doc = fitz.open(stream=content, filetype="pdf")
     
-    # Lógica de extracción de páginas
     indices = []
     for p in re.split(r'[,\s]+', pages):
         if '-' in p:
@@ -129,7 +132,6 @@ async def procesar(response: Response, file: UploadFile = File(...), pages: str 
     doc.close()
     output.seek(0)
     
-    # Actualizar Cookie de usos (vence en 24 horas)
     response = StreamingResponse(output, media_type=mimetype, headers={"Content-Disposition": f"attachment; filename={filename}"})
     response.set_cookie(key="uses", value=str(current_uses + 1), max_age=86400)
     return response
